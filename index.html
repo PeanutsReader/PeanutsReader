@@ -1316,7 +1316,10 @@ function renderDay(res, my) {
   }
   out.appendChild(top);
 
-  resetZoom();                                       // a new day always starts unzoomed
+  V.ptrs.clear(); V.pinch = null; V.drag = null; V.tap = null;
+  const dayKey = ymd(y, m, d);
+  if (V.day !== dayKey) { V.day = dayKey; V.start = V.s > 1; }   // another day: keep the zoom level, start at the beginning of the strip
+  // the same day redrawn (captions switched, for example): keep exactly the view you had
   const stage = el("div", "stage"); stage.id = "stage";
   const area = el("div", "stripArea"); area.id = "stripArea";
   const notesArea = el("div", "notesArea"); notesArea.id = "notesArea";
@@ -1725,7 +1728,7 @@ $("datePanel").addEventListener("keydown", e => {
 });
 
 /* ---- zoom in place: pinch, drag, double-tap, mouse wheel, and the + - 0 keys ---- */
-const V = { s: 1, x: 0, y: 0, ptrs: new Map(), pinch: null, drag: null, tap: null };
+const V = { s: 1, x: 0, y: 0, ptrs: new Map(), pinch: null, drag: null, tap: null, start: false, day: 0 };
 const V_MAX = 6;
 const vFrame = () => document.querySelector("#stripArea .frame");
 function vBase(frame) {                              // where the strip sits unzoomed (zooming does not change layout metrics)
@@ -1736,6 +1739,10 @@ function vApply() {
   const f = vFrame();
   if (!f) return;
   const b = vBase(f), a = b.a;
+  const im = f.querySelector("img");
+  if (V.start && V.s > 1 && im && im.complete && im.naturalWidth && b.w > 0) {    // a new day opens at the start of the strip
+    V.x = 1e9; V.y = 1e9; V.start = false;                                         // (clamped below to the top-left corner)
+  }
   V.s = Math.min(Math.max(V.s, 1), V_MAX);
   if (V.s <= 1.001) { V.s = 1; V.x = 0; V.y = 0; f.style.transform = ""; }
   else {
@@ -1759,7 +1766,7 @@ function vZoomAt(cx, cy, s) {                        // zoom while keeping the p
   vApply();
 }
 function resetZoom() {
-  V.s = 1; V.x = 0; V.y = 0; V.ptrs.clear(); V.pinch = null; V.drag = null; V.tap = null;
+  V.s = 1; V.x = 0; V.y = 0; V.ptrs.clear(); V.pinch = null; V.drag = null; V.tap = null; V.start = false;
   const f = vFrame();
   if (f) f.style.transform = "";
   const rb = document.querySelector("#stage .resetZoom");
