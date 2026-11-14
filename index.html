@@ -447,6 +447,11 @@
 
   /* zoom in place: the strip area handles pinch and drag itself */
   .stripArea { touch-action: none; }
+  /* stacking: the strip sits above the fun facts, so a zoomed strip covers them instead of the text drawing over it */
+  .stage .notesArea { z-index: 1; }
+  .stage .stripArea { z-index: 2; pointer-events: none; }   /* on top, but clicks pass through to the captions beneath */
+  .stage { touch-action: none; }                              /* the stage handles pinch and drag itself */
+  .stage .stripArea .frame { pointer-events: auto; }          /* the picture itself still catches clicks, so it covers what is under it */
   .stage .resetZoom { position: absolute; right: 8px; bottom: 8px; z-index: 3; }
   .stage .resetZoom[hidden] { display: none; }
 
@@ -1778,10 +1783,16 @@ function vKey(factor) {
   const r = a.getBoundingClientRect();
   vZoomAt(r.left + r.width / 2, r.top + r.height / 2, V.s * factor);
 }
+function overStripArea(e) {                          // is the pointer over the strip area (and not on a link or button)?
+  const a = $("stripArea");
+  if (!a || !vFrame()) return false;
+  const r = a.getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return false;
+  return !(e.target.closest && e.target.closest("a, button"));
+}
 out.addEventListener("pointerdown", e => {
-  const area = e.target.closest && e.target.closest("#stripArea");
-  if (!area || !vFrame() || (e.target.closest && e.target.closest("button"))) return;
-  if (area.setPointerCapture) { try { area.setPointerCapture(e.pointerId); } catch (err) {} }
+  if (!overStripArea(e)) return;
+  if (out.setPointerCapture) { try { out.setPointerCapture(e.pointerId); } catch (err) {} }
   V.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (V.ptrs.size === 2) {
     const [a, b2] = [...V.ptrs.values()], b = vBase(vFrame());
@@ -1831,7 +1842,7 @@ function vEnd(e) {
 out.addEventListener("pointerup", vEnd);
 out.addEventListener("pointercancel", vEnd);
 out.addEventListener("wheel", e => {                 // mouse wheel or trackpad pinch over the strip
-  if (!(e.target.closest && e.target.closest("#stripArea")) || !vFrame()) return;
+  if (!overStripArea(e)) return;
   e.preventDefault();
   vZoomAt(e.clientX, e.clientY, V.s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)));
 }, { passive: false });
